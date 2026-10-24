@@ -544,6 +544,31 @@ td { font-size: 11px; }
   .team-page .team-member-table td:nth-child(n) { grid-column: 1; }
 }
 
+/* Reviewer views remain usable on narrow phones and preserve room above fixed navigation. */
+@media (max-width: 620px) {
+  .page-content { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+  .reviewer-stat-grid .stat-card:last-child { grid-column: 1 / -1; }
+  .manager-toolbar:not(.submission-view-toolbar) { align-items: stretch; flex-wrap: wrap; }
+  .manager-toolbar:not(.submission-view-toolbar) .filter-pills { display: grid; width: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .manager-toolbar:not(.submission-view-toolbar) .filter-pill { min-width: 0; padding-inline: 5px; white-space: normal; }
+  .submission-row { grid-template-areas: "icon main" "icon date" "state state" "mark mark" "archive delete"; grid-template-columns: 34px minmax(0, 1fr); }
+  .submission-row:not(.submission-row-managed) { grid-template-areas: "icon main" "icon date" "state state" "mark mark"; }
+  .submission-state { justify-self: start; }
+  .submission-mark-action, .submission-restore-action { width: 100%; }
+  .submission-archive-action { justify-self: start; }
+  .submission-delete-action { justify-self: end; }
+}
+
+@media (max-width: 420px) {
+  .personal-link-card { min-width: 0; padding: 16px; }
+  .personal-link-card > .button-row { display: grid; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .personal-link-card > .button-row > .button { min-width: 0; width: 100%; padding-inline: 6px; }
+  .personal-link-card > .button-row > .icon-button { justify-self: start; width: 44px; min-width: 44px; }
+  .reviewer-share-url-controls { display: grid !important; grid-template-columns: minmax(0, 1fr); }
+  .reviewer-share-url-controls > input { width: 100%; }
+  .reviewer-share-url-actions { display: flex; justify-content: flex-end; gap: 7px; }
+}
+
 /* Public review: compact context, clear privacy cue, and comfortable response rhythm. */
 .public-wrap { width: min(100% - 36px, 720px); padding-top: clamp(30px, 5vw, 52px); }
 .public-intro { max-width: 610px; margin-bottom: 25px; }
