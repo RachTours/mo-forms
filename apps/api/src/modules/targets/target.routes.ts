@@ -6,6 +6,7 @@ import { requireCsrf, requireSession } from "../../middleware/require-session.js
 import { requirePermission } from "../../middleware/require-permission.js";
 import { assignTargets } from "./bulk-assignment.js";
 import { createTargetSchema, idSchema, updateTargetSchema } from "./target.schemas.js";
+import { toCreatedTargetSummary } from "./target-response.js";
 import { autoAssignUnassignedTargets, listAssignments, lockAssignmentTarget, removeAssignment, removeTargetAssignment, setAssignment } from "../assignments/assignment.service.js";
 import { activeTargetListFilter, loadTargetAssignments, loadTargetSubmissionCounts } from "./target-submission-counts.js";
 
@@ -57,7 +58,7 @@ targetRouter.post("/", requirePermission("targets", "create"), requireCsrf, asyn
       const reviewer = assignment
         ? await transaction.membership.findFirst({ where: { id: assignment.reviewerId, organizationId: auth.organizationId }, select: { id: true, user: { select: { displayName: true, email: true } } } })
         : null;
-      return { ...created, assignedReviewer: reviewer ? { membershipId: reviewer.id, ...reviewer.user } : null, submissionCount: 0 };
+      return toCreatedTargetSummary(created, reviewer ? { membershipId: reviewer.id, ...reviewer.user } : null);
     });
     response.status(201).json({ data: target });
   } catch (error) { next(error); }
