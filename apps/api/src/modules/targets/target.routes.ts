@@ -7,7 +7,7 @@ import { requirePermission } from "../../middleware/require-permission.js";
 import { assignTargets } from "./bulk-assignment.js";
 import { createTargetSchema, idSchema, updateTargetSchema } from "./target.schemas.js";
 import { autoAssignUnassignedTargets, listAssignments, lockAssignmentTarget, removeAssignment, removeTargetAssignment, setAssignment } from "../assignments/assignment.service.js";
-import { loadTargetAssignments, loadTargetSubmissionCounts } from "./target-submission-counts.js";
+import { activeTargetListFilter, loadTargetAssignments, loadTargetSubmissionCounts } from "./target-submission-counts.js";
 
 export const targetRouter = Router();
 const bulkAssignmentSchema = z.object({ targetIds: z.array(idSchema).min(1).max(100).refine((ids) => new Set(ids).size === ids.length, "Target IDs must be unique."), reviewerId: idSchema }).strict();
@@ -30,7 +30,7 @@ targetRouter.get("/", requirePermission("targets", "read"), async (request, resp
     const limit = z.coerce.number().int().min(1).max(100).default(25).parse(request.query.limit);
     const cursor = request.query.cursor ? idSchema.parse(request.query.cursor) : undefined;
     const search = z.string().trim().max(120).default("").parse(request.query.search ?? "");
-    const where = { organizationId: auth.organizationId, status: "ACTIVE" as const, archivedAt: null, displayName: { contains: search } };
+    const where = activeTargetListFilter(auth.organizationId, search);
     const rows = await prisma.reviewTarget.findMany({ where, orderBy: [{ displayName: "asc" }, { id: "asc" }], take: limit + 1, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}), select: {
       id: true, displayName: true, email: true, createdAt: true, updatedAt: true,
     } });
