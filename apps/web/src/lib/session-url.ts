@@ -8,6 +8,14 @@ export function withSessionSelector(path: string, sessionId: string | null): str
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
+export function workspaceNavigationTarget(path: string, sessionId: string | null): string | null {
+  if (!sessionId || !path.startsWith("/") || path.startsWith("//")) return null;
+  const url = new URL(path, "https://reviewroom.invalid");
+  const isWorkspacePath = ["/admin", "/reviewer"].some((prefix) => url.pathname === prefix || url.pathname.startsWith(`${prefix}/`));
+  if (!isWorkspacePath) return null;
+  return withSessionSelector(`${url.pathname}${url.search}${url.hash}`, sessionId);
+}
+
 export function sessionSelectorFromUrl(value: string | null | undefined): string | undefined {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return undefined;
   try {

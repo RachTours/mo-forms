@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { sessionSelectorFromUrl, withSessionSelector } from "./session-url.ts";
+import { sessionSelectorFromUrl, withSessionSelector, workspaceNavigationTarget } from "./session-url.ts";
 
 test("session selector is preserved alongside route query and hash", () => {
   const id = "11111111-1111-4111-8111-111111111111";
@@ -13,4 +13,13 @@ test("session selector ignores malformed and external values", () => {
   assert.equal(sessionSelectorFromUrl("https://example.com/?rr_session=11111111-1111-4111-8111-111111111111"), undefined);
   assert.equal(sessionSelectorFromUrl("/admin?rr_session=not-a-uuid"), undefined);
   assert.throws(() => withSessionSelector("//attacker.invalid", "id"), /same-origin/);
+});
+
+test("workspace navigation always routes through the current tab session", () => {
+  const current = "11111111-1111-4111-8111-111111111111";
+  const stale = "22222222-2222-4222-8222-222222222222";
+  assert.equal(
+    workspaceNavigationTarget(`/reviewer/submissions?rr_session=${stale}`, current),
+    `/reviewer/submissions?rr_session=${current}`,
+  );
 });
