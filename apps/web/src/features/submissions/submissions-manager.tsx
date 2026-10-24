@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Archive, Check, CheckCheck, ClipboardList, RotateCcw, Trash2, X } from "lucide-react";
 import { useApi } from "../../lib/client-api";
+import { ApiClientError } from "../../lib/api-client";
 import { formatDate } from "../../lib/date-format";
 import { useWorkspaceSession } from "../../components/workspace-shell";
 import { workspacePathForRole } from "../../lib/workspace-access";
@@ -72,21 +73,6 @@ export function SubmissionsManager({ initialRows, initialArchivedRows, reviewers
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Review status could not be updated."); }
   }
 
-  async function archive(row: Submission) {
-    if (!window.confirm(`Archive the review for “${row.reviewedPersonName || row.target.displayName}”? It will leave the active inbox but remain in the database and Archived view.`)) return;
-    setError(""); setNotice(""); setBusyId(row.id);
-    try {
-      await api(`/submissions/${row.id}`, { method: "DELETE" });
-      const archived = { ...row, archivedAt: new Date().toISOString() };
-      setRows((items) => items.filter((item) => item.id !== row.id));
-      setArchivedRows((items) => [archived, ...items.filter((item) => item.id !== row.id)]);
-      setReviewerData((current) => current ? { ...current, rows: current.rows.filter((item) => item.id !== row.id) } : current);
-      setSelectedIds((current) => current.filter((id) => id !== row.id));
-      setNotice("Review archived. Restore it from the Archived view any time.");
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Review could not be archived."); }
-    finally { setBusyId(null); }
-  }
-
   async function archiveSelected() {
     if (selectedIds.length === 0 || selectedIds.length > 100) return;
     if (!window.confirm(`Archive ${selectedIds.length} selected ${selectedIds.length === 1 ? "review" : "reviews"}? They will leave the active inbox and remain available in Archived.`)) return;
@@ -110,15 +96,35 @@ export function SubmissionsManager({ initialRows, initialArchivedRows, reviewers
     const confirmation = window.prompt(`Permanently delete ${selectedIds.length} selected ${selectedIds.length === 1 ? "review" : "reviews"} and their answers? This cannot be undone. Type DELETE to confirm.`);
     if (confirmation !== "DELETE") return;
     setError(""); setNotice(""); setBusyId("bulk-delete");
+    let deletedIds: string[] = [];
     try {
-      const result = await api<{ data: { deletedIds: string[] } }>("/submissions/permanent-batch", { method: "POST", body: JSON.stringify({ submissionIds: selectedIds }) });
-      const deletedSet = new Set(result.data.deletedIds);
+      try {
+        const result = await api<{ data: { deletedIds: string[] } }>("/submissions/permanent-batch", { method: "POST", body: JSON.stringify({ submissionIds: selectedIds }) });
+        deletedIds = result.data.deletedIds;
+      } catch (cause) {
+        // Older API deployments lack the batch route. Reuse the established single-delete route in that case.
+        if (!(cause instanceof ApiClientError) || cause.status !== 404 || cause.code !== "NOT_FOUND") throw cause;
+        for (const id of selectedIds) {
+          await api(`/submissions/${id}/permanent`, { method: "DELETE" });
+          deletedIds.push(id);
+        }
+      }
+      const deletedSet = new Set(deletedIds);
       setRows((items) => items.filter((row) => !deletedSet.has(row.id)));
       setArchivedRows((items) => items.filter((row) => !deletedSet.has(row.id)));
       setReviewerData((current) => current ? { ...current, rows: current.rows.filter((row) => !deletedSet.has(row.id)) } : current);
       setSelectedIds((current) => current.filter((id) => !deletedSet.has(id)));
       setNotice(`${deletedSet.size} ${deletedSet.size === 1 ? "review" : "reviews"} and their answers permanently deleted.`);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Selected reviews could not be permanently deleted."); }
+    } catch (cause) {
+      if (deletedIds.length > 0) {
+        const deletedSet = new Set(deletedIds);
+        setRows((items) => items.filter((row) => !deletedSet.has(row.id)));
+        setArchivedRows((items) => items.filter((row) => !deletedSet.has(row.id)));
+        setReviewerData((current) => current ? { ...current, rows: current.rows.filter((row) => !deletedSet.has(row.id)) } : current);
+        setSelectedIds((current) => current.filter((id) => !deletedSet.has(id)));
+        setError(`${deletedIds.length} selected ${deletedIds.length === 1 ? "review was" : "reviews were"} deleted before the remaining request failed. Refresh the page and retry the remaining selection.`);
+      } else setError(cause instanceof Error ? cause.message : "Selected reviews could not be permanently deleted.");
+    }
     finally { setBusyId(null); }
   }
 
@@ -134,19 +140,6 @@ export function SubmissionsManager({ initialRows, initialArchivedRows, reviewers
     finally { setBusyId(null); }
   }
 
-  async function permanentlyDelete(row: Submission) {
-    const personName = row.reviewedPersonName || row.target.displayName;
-    if (window.prompt(`This permanently removes the review and its answers from the database. Type “${personName}” to confirm.`) !== personName) return;
-    setError(""); setNotice(""); setBusyId(row.id);
-    try {
-      await api(`/submissions/${row.id}/permanent`, { method: "DELETE" });
-      setRows((items) => items.filter((item) => item.id !== row.id));
-      setArchivedRows((items) => items.filter((item) => item.id !== row.id));
-      setNotice(`Review for “${personName}” and its answers were permanently deleted.`);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Review could not be permanently deleted."); }
-    finally { setBusyId(null); }
-  }
-
   return <>
     {canManage && <div className="manager-toolbar submission-view-toolbar">
       <div className="filter-pills" aria-label="Submission views">
@@ -158,19 +151,17 @@ export function SubmissionsManager({ initialRows, initialArchivedRows, reviewers
       <span className="muted-caption">{loadingReviewer ? "Loading…" : visibleRows.length + " shown"}</span>
     </div>}
     {!canManage && <div className="manager-toolbar"><div className="filter-pills" aria-label="Filter submissions">{(["all", "unread", "read"] as const).map((value) => <button type="button" key={value} className={filter === value ? "filter-pill active" : "filter-pill"} onClick={() => setFilter(value)}>{value === "all" ? "All responses" : value === "read" ? "Reviewed" : "Needs review"}</button>)}</div><span className="muted-caption">{visibleRows.length} shown</span></div>}
-    {canManage && view === "active" && !loadingReviewer && <div className="submission-bulk-toolbar"><label className="submission-select-all"><input type="checkbox" aria-label="Select all displayed submissions" checked={allVisibleSelected} disabled={visibleIds.length === 0 || busyId !== null} onChange={toggleAllVisible} /><span>{allVisibleSelected ? "Clear visible selection" : `Select all ${visibleIds.length} shown`}</span></label>{selectedIds.length > 0 && <div className="submission-bulk-actions"><span aria-live="polite">{selectedIds.length} selected</span><button type="button" className="button button-small" disabled={busyId !== null || selectedIds.length > 100} onClick={() => void archiveSelected()}><Archive size={13} /> {busyId === "bulk" ? "Archiving…" : "Archive"}</button><button type="button" className="button button-small danger-action" disabled={busyId !== null || selectedIds.length > 100} onClick={() => void deleteSelected()}><Trash2 size={13} /> {busyId === "bulk-delete" ? "Deleting…" : "Delete permanently"}</button><button type="button" className="icon-button" aria-label="Clear selection" title="Clear selection" disabled={busyId !== null} onClick={() => setSelectedIds([])}><X size={14} /></button></div>}</div>}
+    {canManage && !loadingReviewer && <div className="submission-bulk-toolbar"><label className="submission-select-all"><input type="checkbox" aria-label="Select all displayed submissions" checked={allVisibleSelected} disabled={visibleIds.length === 0 || busyId !== null} onChange={toggleAllVisible} /><span>{allVisibleSelected ? "Clear visible selection" : `Select all ${visibleIds.length} shown`}</span></label>{selectedIds.length > 0 && <div className="submission-bulk-actions"><span aria-live="polite">{selectedIds.length} selected</span>{view === "active" && <button type="button" className="button button-small" disabled={busyId !== null || selectedIds.length > 100} onClick={() => void archiveSelected()}><Archive size={13} /> {busyId === "bulk" ? "Archiving…" : "Archive"}</button>}<button type="button" className="button button-small danger-action" disabled={busyId !== null || selectedIds.length > 100} onClick={() => void deleteSelected()}><Trash2 size={13} /> {busyId === "bulk-delete" ? "Deleting…" : "Delete permanently"}</button><button type="button" className="icon-button" aria-label="Clear selection" title="Clear selection" disabled={busyId !== null} onClick={() => setSelectedIds([])}><X size={14} /></button></div>}</div>}
     {error && <p className="form-error" role="alert">{error}</p>}{notice && <p className="form-success" role="status">{notice}</p>}
     {loadingReviewer ? <div className="panel empty-state"><h2>Loading reviewer reviews</h2><p>Getting the selected reviewer’s submissions.</p></div> : visibleRows.length === 0 ? <div className="panel empty-state"><span className="empty-icon"><ClipboardList /></span><h2>{view === "archived" ? "No archived reviews" : "No responses in this view"}</h2><p>{view === "archived" ? "Archived reviews stay here until you restore or permanently delete them." : "Submitted feedback will appear here."}</p></div> :
       <div className="panel submission-list">{visibleRows.map((row) => <article className={`submission-row ${canManage ? "submission-row-managed" : ""} ${selectedIds.includes(row.id) ? "submission-row-selected" : ""}`} key={row.id}>
-        {canManage && view === "active" && <label className="submission-select"><input type="checkbox" aria-label={`Select review for ${row.reviewedPersonName || row.target.displayName}`} checked={selectedIds.includes(row.id)} disabled={busyId !== null} onChange={() => toggleSelected(row.id)} /></label>}
+        {canManage && <label className="submission-select"><input type="checkbox" aria-label={`Select review for ${row.reviewedPersonName || row.target.displayName}`} checked={selectedIds.includes(row.id)} disabled={busyId !== null} onChange={() => toggleSelected(row.id)} /></label>}
         <span className={`submission-status ${row.reviewedAt ? "read" : ""}`}>{row.reviewedAt ? <CheckCheck size={15} /> : <ClipboardList size={15} />}</span>
         <Link className="submission-main" href={`${workspacePathForRole(`/submissions/${row.id}`, session.role)}${view === "archived" ? "?archived=true" : ""}`}><strong>{row.reviewedPersonName || row.target.displayName}</strong><small>{row.form.title} · Submitted by {row.reviewer.user.displayName} · Version {row.formVersion.version}</small></Link>
         <time className="submission-date">{formatDate(row.submittedAt)}</time>
         {view === "archived" ? <span className="status status-pending submission-state">Archived</span> : <span className={`status submission-state ${row.reviewedAt ? "" : "status-pending"}`}>{row.reviewedAt ? "Reviewed" : "Needs review"}</span>}
         {view === "active" && <button className="button button-small submission-mark-action" disabled={busyId !== null} onClick={() => void toggle(row)}><Check size={13} /> {row.reviewedAt ? "Reopen" : "Mark reviewed"}</button>}
-        {canManage && view === "active" && <button className="icon-button submission-archive-action" type="button" aria-label={`Archive review for ${row.reviewedPersonName || row.target.displayName}`} title="Archive; retain database record" disabled={busyId !== null} onClick={() => void archive(row)}><Archive size={14} /></button>}
         {canManage && view === "archived" && <button type="button" className="button button-small submission-restore-action" disabled={busyId !== null} onClick={() => void restore(row)}><RotateCcw size={13} /> Restore</button>}
-        {canManage && <button className="icon-button danger-action submission-delete-action" type="button" aria-label={`Permanently delete review for ${row.reviewedPersonName || row.target.displayName}`} title="Permanently delete review and answers" disabled={busyId !== null} onClick={() => void permanentlyDelete(row)}><Trash2 size={14} /></button>}
       </article>)}</div>}
     {canManage && reviewerCursor && !loadingReviewer && <div className="load-more-row"><button type="button" className="button button-small" disabled={loadingMore} onClick={() => void loadMoreReviewerRows()}>{loadingMore ? "Loading…" : "Load more reviewer reviews"}</button></div>}
   </>;

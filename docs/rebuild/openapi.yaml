@@ -338,8 +338,8 @@ paths:
   /submissions/permanent-batch:
     post:
       tags: [Submissions]
-      summary: Permanently delete selected active submissions
-      description: Permanently deletes up to 100 active submissions and their answers in the current workspace as one transaction. This cannot be undone.
+      summary: Permanently delete selected submissions
+      description: Permanently deletes up to 100 submissions, active or archived, and their answers in the current workspace as one transaction. This cannot be undone.
       security: [{ adminSession: [] }]
       requestBody:
         required: true
@@ -358,7 +358,7 @@ paths:
                   items: { type: string, format: uuid }
       responses:
         '200': { description: Permanently deleted submission IDs. }
-        '404': { description: A selected submission is not active in this workspace. }
+        '404': { description: A selected submission is not in this workspace. }
         '409': { description: A selected submission changed during the operation. }
   /submissions/{submissionId}:
     get:

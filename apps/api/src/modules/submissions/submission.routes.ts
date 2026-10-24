@@ -92,13 +92,13 @@ submissionRouter.post("/permanent-batch", requirePermission("submissions", "arch
     const auth = request.auth!;
     const deletedIds = await prisma.$transaction(async (transaction) => {
       const current = await transaction.submission.findMany({
-        where: { organizationId: auth.organizationId, id: { in: submissionIds }, archivedAt: null },
+        where: { organizationId: auth.organizationId, id: { in: submissionIds } },
         select: { id: true },
       });
-      if (current.length !== submissionIds.length) throw new HttpError(404, "SUBMISSION_NOT_FOUND", "One or more selected reviews are no longer active in this workspace.");
+      if (current.length !== submissionIds.length) throw new HttpError(404, "SUBMISSION_NOT_FOUND", "One or more selected reviews were not found in this workspace.");
 
       const deleted = await transaction.submission.deleteMany({
-        where: { organizationId: auth.organizationId, id: { in: submissionIds }, archivedAt: null },
+        where: { organizationId: auth.organizationId, id: { in: submissionIds } },
       });
       if (deleted.count !== submissionIds.length) throw new HttpError(409, "SUBMISSION_STATE_CONFLICT", "One or more selected reviews changed. Refresh the inbox and try again.");
 
