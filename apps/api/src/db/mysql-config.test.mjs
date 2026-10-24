@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildDatabaseUrl, readMysqlConnection, resolveMysqlSsl } from "./mysql-config.ts";
+import { buildDatabaseUrl, readMysqlConnection, resolveMysqlSsl } from "../../dist/db/mysql-config.js";
 
 test("reads the separate Hostinger MySQL settings", () => {
   assert.deepEqual(readMysqlConnection({

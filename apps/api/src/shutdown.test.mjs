@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createShutdownHandler } from "./shutdown.ts";
+import { createShutdownHandler } from "../dist/shutdown.js";
 
 test("shutdown drains HTTP before disconnecting Prisma and exits once", async () => {
   const events = [];
