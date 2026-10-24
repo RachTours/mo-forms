@@ -19,7 +19,7 @@ jobs:
       DATABASE_URL: mysql://ci:ci-password@127.0.0.1:3306/reviewroom
       SESSION_SECRET: ci-only-session-secret-with-at-least-32-bytes
       WEB_ORIGIN: http://localhost:5000
-      API_INTERNAL_URL: http://localhost:5001
+      API_INTERNAL_URL: https://api.example.test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
