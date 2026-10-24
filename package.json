@@ -9,7 +9,7 @@
     "build": "npm run build --workspace @reviewroom/contracts && npm run build --workspace @reviewroom/domain && npm run db:generate && npm run build --workspace @reviewroom/api && npm run build --workspace @reviewroom/web",
     "typecheck": "npm run build --workspace @reviewroom/contracts && npm run build --workspace @reviewroom/domain && npm run db:generate && npm run typecheck --workspace @reviewroom/contracts && npm run typecheck --workspace @reviewroom/domain && npm run typecheck --workspace @reviewroom/api && npm run typecheck --workspace @reviewroom/web",
     "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run db:generate && npm run test --workspace @reviewroom/contracts && npm run test --workspace @reviewroom/domain && npm run test --workspace @reviewroom/api && npm run test --workspace @reviewroom/web",
+    "test": "node scripts/run-tests.mjs",
     "db:generate": "npm run db:generate --workspace @reviewroom/api",
     "db:migrate": "npm run db:migrate --workspace @reviewroom/api",
     "build:hostinger:web": "npm run build:hostinger --workspace @reviewroom/web",
