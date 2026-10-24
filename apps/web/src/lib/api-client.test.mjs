@@ -32,6 +32,15 @@ test("writes include the role-specific CSRF token and JSON content type", async 
   assert.equal(headers.get("Content-Type"), "application/json");
 });
 
+test("legacy role-cookie sessions do not send a per-tab selector before reauthentication", async () => {
+  let headers;
+  await requestApi("/members", {}, {
+    role: "OWNER", csrfToken: "c".repeat(64), sessionId: null,
+    fetcher: async (_url, init) => { headers = init.headers; return response(200, { data: [] }); },
+  });
+  assert.equal(headers.has("X-Reviewroom-Session-Id"), false);
+});
+
 test("returns undefined for 204 and does not attempt to parse a body", async () => {
   const result = await requestApi("/members/m1", { method: "DELETE" }, {
     role: "OWNER", csrfToken: "c".repeat(64), sessionId: "11111111-1111-4111-8111-111111111111", fetcher: async () => response(204),

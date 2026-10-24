@@ -61,7 +61,6 @@ export function setSessionCookie(response: Response, token: string, audience: Se
   response.cookie(sessionId ? sessionCookieNameForSession(audience, sessionId) : sessionCookieNameForAudience(audience), token, options);
   const { maxAge: _maxAge, ...clearOptions } = options;
   response.clearCookie(legacySessionCookieName, clearOptions);
-  if (sessionId) response.clearCookie(sessionCookieNameForAudience(audience), clearOptions);
 }
 
 export function clearSessionCookie(response: Response, cookieName: string): void {

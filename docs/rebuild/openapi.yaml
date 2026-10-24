@@ -481,7 +481,7 @@ components:
         organizationId: { type: string, format: uuid }
         organizationName: { type: string, minLength: 1, maxLength: 160 }
         membershipId: { type: string, format: uuid }
-        sessionId: { type: string, format: uuid }
+        sessionId: { type: [string, 'null'], format: uuid, description: Null for a pre-selector session until the user signs in again. }
         role: { type: string, enum: [OWNER, ADMIN, REVIEWER] }
         csrfToken: { type: string, minLength: 64, maxLength: 64 }
     AssignmentSetRequest:

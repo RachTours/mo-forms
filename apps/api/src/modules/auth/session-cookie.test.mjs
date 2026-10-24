@@ -76,6 +76,6 @@ test("session login sets its own HttpOnly cookie and clears the legacy role cook
   const id = "33333333-3333-4333-8333-333333333333";
   setSessionCookie({ cookie: (...args) => written.push(args), clearCookie: (...args) => cleared.push(args) }, "reviewer-secret", "reviewer", id);
   assert.deepEqual(written.map(([name, value]) => [name, value]), [[sessionCookieNameForSession("reviewer", id), "reviewer-secret"]]);
-  assert.deepEqual(cleared.map(([name]) => name), [legacySessionCookieName, reviewerSessionCookieName]);
+  assert.deepEqual(cleared.map(([name]) => name), [legacySessionCookieName]);
   assert.equal(written[0][2].httpOnly, true);
 });

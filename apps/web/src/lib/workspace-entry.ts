@@ -13,5 +13,5 @@ export async function routeWorkspaceEntry(audience: Audience): Promise<never> {
   if (!session.success) redirect(`${signInPathForRole(audience)}?reason=session-invalid`);
   const destination = workspaceEntryPath(audience, session.data.role);
   if (destination === signInPathForRole(audience)) redirect(`${destination}?reason=wrong-workspace`);
-  redirect(destination === signInPathForRole(audience) ? destination : withSessionSelector(destination, session.data.sessionId));
+  redirect(destination === signInPathForRole(audience) || !session.data.sessionId ? destination : withSessionSelector(destination, session.data.sessionId));
 }

@@ -1,7 +1,8 @@
 export const sessionSelectorParam = "rr_session";
 
-export function withSessionSelector(path: string, sessionId: string): string {
+export function withSessionSelector(path: string, sessionId: string | null): string {
   if (!path.startsWith("/") || path.startsWith("//")) throw new TypeError("Session-aware routes must be same-origin paths.");
+  if (!sessionId) return path;
   const url = new URL(path, "https://reviewroom.invalid");
   url.searchParams.set(sessionSelectorParam, sessionId);
   return `${url.pathname}${url.search}${url.hash}`;

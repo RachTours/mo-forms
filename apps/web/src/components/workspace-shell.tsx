@@ -25,6 +25,7 @@ export function WorkspaceShell({ session, theme, children }: { session: SessionR
   const panelName = panelNameForAudience(session.role === "REVIEWER" ? "reviewer" : "admin");
 
   useEffect(() => {
+    if (!session.sessionId) return;
     const addSelectorToWorkspaceLinks = () => {
       for (const anchor of document.querySelectorAll<HTMLAnchorElement>("a[href]")) {
         const url = new URL(anchor.href, window.location.href);
@@ -39,7 +40,9 @@ export function WorkspaceShell({ session, theme, children }: { session: SessionR
   }, [session.sessionId]);
 
   async function signOut() {
-    const response = await fetch("/api/v1/auth/logout", { method: "POST", credentials: "same-origin", headers: { "X-CSRF-Token": session.csrfToken, "X-Reviewroom-Audience": session.role === "REVIEWER" ? "reviewer" : "admin", "X-Reviewroom-Session-Id": session.sessionId } });
+    const headers = new Headers({ "X-CSRF-Token": session.csrfToken, "X-Reviewroom-Audience": session.role === "REVIEWER" ? "reviewer" : "admin" });
+    if (session.sessionId) headers.set("X-Reviewroom-Session-Id", session.sessionId);
+    const response = await fetch("/api/v1/auth/logout", { method: "POST", credentials: "same-origin", headers });
     if (response.ok) {
       router.replace(signInPathForRole(session.role));
       router.refresh();
@@ -47,6 +50,7 @@ export function WorkspaceShell({ session, theme, children }: { session: SessionR
   }
 
   function preserveTabSession(event: React.MouseEvent<HTMLDivElement>) {
+    if (!session.sessionId) return;
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     if (!(event.target instanceof Element)) return;
     const anchor = event.target.closest("a[href]");

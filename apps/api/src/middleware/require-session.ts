@@ -30,6 +30,7 @@ export const requireSession: RequestHandler = async (request, _response, next) =
       : session.membership.role === "OWNER" || session.membership.role === "ADMIN";
     if (!matchesAudience) throw new HttpError(401, "UNAUTHENTICATED", "Sign in to continue.");
     request.authCookieName = cookieName;
+    if (sessionSelector) request.authSessionSelector = sessionSelector;
     request.auth = {
       sessionId: session.id,
       userId: session.user.id,

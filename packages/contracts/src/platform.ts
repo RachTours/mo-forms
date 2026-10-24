@@ -41,7 +41,7 @@ export const sessionResponseSchema = z.object({
   organizationId: z.string().uuid(),
   organizationName: z.string().min(1).max(160),
   membershipId: z.string().uuid(),
-  sessionId: z.string().uuid(),
+  sessionId: z.string().uuid().nullable(),
   role: z.enum(roles),
   csrfToken: z.string().length(64),
 }).strict();

@@ -15,6 +15,7 @@ declare global {
       };
       csrfToken?: string;
       authCookieName?: string;
+      authSessionSelector?: string;
     }
   }
 }

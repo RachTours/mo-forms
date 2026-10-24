@@ -105,7 +105,7 @@ authRouter.post("/password-reset", authRateLimit, async (request, response, next
 authRouter.get("/session", requireSession, (request, response) => {
   const auth = request.auth;
   if (!auth) return response.status(401).end();
-    return response.status(200).json({ user: { id: auth.userId, email: auth.email, displayName: auth.displayName }, organizationId: auth.organizationId, organizationName: auth.organizationName, membershipId: auth.membershipId, sessionId: auth.sessionId, role: auth.role, csrfToken: request.csrfToken });
+    return response.status(200).json({ user: { id: auth.userId, email: auth.email, displayName: auth.displayName }, organizationId: auth.organizationId, organizationName: auth.organizationName, membershipId: auth.membershipId, sessionId: request.authSessionSelector ?? null, role: auth.role, csrfToken: request.csrfToken });
 });
 
 authRouter.post("/logout", requireSession, requireCsrf, async (request, response, next) => {

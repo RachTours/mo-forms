@@ -78,6 +78,7 @@ test("session and error response envelopes are strict and stable", () => {
     csrfToken: "a".repeat(64),
   };
   assert.equal(sessionResponseSchema.safeParse(session).success, true);
+  assert.equal(sessionResponseSchema.safeParse({ ...session, sessionId: null }).success, true, "older role-scoped sessions remain usable during reauthentication");
   assert.equal(sessionResponseSchema.safeParse({ ...session, passwordHash: "must-not-leak" }).success, false);
   assert.equal(apiErrorSchema.safeParse({ error: { code: "ASSIGNMENT_CHANGED", message: "Refresh.", requestId: "request-1" } }).success, true);
   assert.equal(apiErrorSchema.safeParse({ error: { code: "x", message: "x", secret: "leak" } }).success, false);
