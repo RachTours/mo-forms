@@ -4,7 +4,7 @@ import { prisma } from "../../db/client.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { requireCsrf, requireSession } from "../../middleware/require-session.js";
 import { requirePermission } from "../../middleware/require-permission.js";
-import { getCompletionPercent } from "./progress-metrics.js";
+import { getSubmissionCompletionPercent } from "./progress-metrics.js";
 
 export const progressRouter = Router();
 progressRouter.use(requireSession);
@@ -55,7 +55,7 @@ progressRouter.get("/summary", async (request, response, next) => {
     ]);
     const completedTargets = Number(completedRows[0]?.completed ?? 0n);
     const targetCount = config?.targetCount ?? organizationTargetCount;
-    const completionPercent = getCompletionPercent(completedTargets, targetCount);
+    const completionPercent = getSubmissionCompletionPercent(responseCount, targetCount);
     response.json({ data: { activeTargets, assignedTargets, completedTargets, responseCount, unassignedTargets, targetCount, completionRule: config?.completionRule ?? "ONE_RESPONSE", completionPercent } });
   } catch (error) { next(error); }
 });

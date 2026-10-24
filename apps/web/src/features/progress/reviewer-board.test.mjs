@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getPeopleRemainingForGoal, getReviewerGoalLabels, sortReviewerProgress, toReviewerProgress } from "./reviewer-board.ts";
+import { getPeopleRemainingForGoal, sortReviewerProgress, toReviewerProgress } from "./reviewer-board.ts";
 
 test("people still to add counts the difference between the goal and active targets", () => {
   assert.equal(getPeopleRemainingForGoal(50, 2), 48);
@@ -8,14 +8,6 @@ test("people still to add counts the difference between the goal and active targ
 
 test("people still to add never becomes negative after the goal is reached", () => {
   assert.equal(getPeopleRemainingForGoal(50, 52), 0);
-});
-
-test("reviewer progress distinguishes completed people from submission count", () => {
-  assert.deepEqual(getReviewerGoalLabels(1, 50, 3), {
-    goal: "1 of 50 people reviewed · 49 remaining",
-    submissions: "3 submissions",
-    explanation: "Multiple submissions for one person count once toward the goal.",
-  });
 });
 
 const source = [

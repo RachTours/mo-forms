@@ -1,15 +1,21 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getCompletionPercent } from "../../../dist/modules/progress/progress-metrics.js";
+import { getSubmissionCompletionPercent } from "../../../dist/modules/progress/progress-metrics.js";
 
-test("reviewer completion uses the workspace goal instead of assigned targets", () => {
-  assert.equal(getCompletionPercent(1, 50), 2);
+test("submission progress is measured against the workspace goal", () => {
+  assert.equal(getSubmissionCompletionPercent(2, 50), 4);
+  assert.equal(getSubmissionCompletionPercent(3, 50), 6);
+});
+
+test("submission progress keeps one decimal place when the percentage is fractional", () => {
+  assert.equal(getSubmissionCompletionPercent(1, 40), 2.5);
+  assert.equal(getSubmissionCompletionPercent(13, 500), 2.6);
 });
 
 test("progress is zero when the workspace goal is zero", () => {
-  assert.equal(getCompletionPercent(0, 0), 0);
+  assert.equal(getSubmissionCompletionPercent(0, 0), 0);
 });
 
 test("progress is capped at the workspace goal", () => {
-  assert.equal(getCompletionPercent(60, 50), 100);
+  assert.equal(getSubmissionCompletionPercent(60, 50), 100);
 });
