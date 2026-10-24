@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Archive, Check, CheckCheck, ClipboardList, RotateCcw, Trash2 } from "lucide-react";
+import { Archive, Check, CheckCheck, ClipboardList, RotateCcw, Trash2, X } from "lucide-react";
 import { useApi } from "../../lib/client-api";
 import { formatDate } from "../../lib/date-format";
 import { useWorkspaceSession } from "../../components/workspace-shell";
@@ -24,6 +24,7 @@ export function SubmissionsManager({ initialRows, initialArchivedRows, reviewers
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const reviewerQueryKey = view + ":" + reviewerFilter;
   const loadingReviewer = Boolean(canManage && reviewerFilter && reviewerData?.key !== reviewerQueryKey);
   const reviewerCursor = reviewerData?.key === reviewerQueryKey ? reviewerData.cursor : null;
@@ -39,6 +40,17 @@ export function SubmissionsManager({ initialRows, initialArchivedRows, reviewers
 
   const sourceRows = reviewerFilter ? (reviewerData?.key === reviewerQueryKey ? reviewerData.rows : []) : view === "archived" ? archivedRows : rows;
   const visibleRows = view === "archived" ? sourceRows : sourceRows.filter((row) => filter === "all" || (filter === "read") === Boolean(row.reviewedAt));
+  const visibleIds = visibleRows.map((row) => row.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) => current.includes(id) ? current.filter((selected) => selected !== id) : [...current, id]);
+  }
+
+  function toggleAllVisible() {
+    const visible = new Set(visibleIds);
+    setSelectedIds((current) => allVisibleSelected ? current.filter((id) => !visible.has(id)) : [...new Set([...current, ...visibleIds])]);
+  }
 
   async function loadMoreReviewerRows() {
     if (!reviewerFilter || !reviewerCursor || loadingMore) return;
@@ -68,8 +80,28 @@ export function SubmissionsManager({ initialRows, initialArchivedRows, reviewers
       const archived = { ...row, archivedAt: new Date().toISOString() };
       setRows((items) => items.filter((item) => item.id !== row.id));
       setArchivedRows((items) => [archived, ...items.filter((item) => item.id !== row.id)]);
+      setReviewerData((current) => current ? { ...current, rows: current.rows.filter((item) => item.id !== row.id) } : current);
+      setSelectedIds((current) => current.filter((id) => id !== row.id));
       setNotice("Review archived. Restore it from the Archived view any time.");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Review could not be archived."); }
+    finally { setBusyId(null); }
+  }
+
+  async function archiveSelected() {
+    if (selectedIds.length === 0 || selectedIds.length > 100) return;
+    if (!window.confirm(`Archive ${selectedIds.length} selected ${selectedIds.length === 1 ? "review" : "reviews"}? They will leave the active inbox and remain available in Archived.`)) return;
+    setError(""); setNotice(""); setBusyId("bulk");
+    try {
+      const result = await api<{ data: { archivedIds: string[] } }>("/submissions/archive-batch", { method: "POST", body: JSON.stringify({ submissionIds: selectedIds }) });
+      const archivedAt = new Date().toISOString();
+      const archivedSet = new Set(result.data.archivedIds);
+      const archived = sourceRows.filter((row) => archivedSet.has(row.id)).map((row) => ({ ...row, archivedAt }));
+      setRows((items) => items.filter((row) => !archivedSet.has(row.id)));
+      setArchivedRows((items) => [...archived, ...items.filter((row) => !archivedSet.has(row.id))]);
+      setReviewerData((current) => current ? { ...current, rows: current.rows.filter((row) => !archivedSet.has(row.id)) } : current);
+      setSelectedIds((current) => current.filter((id) => !archivedSet.has(id)));
+      setNotice(`${archivedSet.size} ${archivedSet.size === 1 ? "review" : "reviews"} archived. Restore them from the Archived view any time.`);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Selected reviews could not be archived."); }
     finally { setBusyId(null); }
   }
 
@@ -101,17 +133,19 @@ export function SubmissionsManager({ initialRows, initialArchivedRows, reviewers
   return <>
     {canManage && <div className="manager-toolbar submission-view-toolbar">
       <div className="filter-pills" aria-label="Submission views">
-        <button type="button" className={view === "active" ? "filter-pill active" : "filter-pill"} onClick={() => setView("active")}>Active</button>
-        <button type="button" className={view === "archived" ? "filter-pill active" : "filter-pill"} onClick={() => setView("archived")}>Archived <span>{archivedRows.length}</span></button>
+        <button type="button" className={view === "active" ? "filter-pill active" : "filter-pill"} onClick={() => { setSelectedIds([]); setView("active"); }}>Active</button>
+        <button type="button" className={view === "archived" ? "filter-pill active" : "filter-pill"} onClick={() => { setSelectedIds([]); setView("archived"); }}>Archived <span>{archivedRows.length}</span></button>
       </div>
-      <label className="reviewer-submission-filter"><span>Reviewer</span><select aria-label="Filter submissions by reviewer" value={reviewerFilter} onChange={(event) => setReviewerFilter(event.target.value)}><option value="">All reviewers</option>{reviewers.map((reviewer) => <option key={reviewer.id} value={reviewer.id}>{reviewer.user.displayName} · {reviewer.user.email}</option>)}</select></label>
-      {view === "active" && <div className="filter-pills" aria-label="Filter active submissions">{(["all", "unread", "read"] as const).map((value) => <button type="button" key={value} className={filter === value ? "filter-pill active" : "filter-pill"} onClick={() => setFilter(value)}>{value === "all" ? "All responses" : value === "read" ? "Reviewed" : "Needs review"}</button>)}</div>}
+      <label className="reviewer-submission-filter"><span>Reviewer</span><select aria-label="Filter submissions by reviewer" value={reviewerFilter} onChange={(event) => { setSelectedIds([]); setReviewerFilter(event.target.value); }}><option value="">All reviewers</option>{reviewers.map((reviewer) => <option key={reviewer.id} value={reviewer.id}>{reviewer.user.displayName} · {reviewer.user.email}</option>)}</select></label>
+      {view === "active" && <div className="filter-pills" aria-label="Filter active submissions">{(["all", "unread", "read"] as const).map((value) => <button type="button" key={value} className={filter === value ? "filter-pill active" : "filter-pill"} onClick={() => { setSelectedIds([]); setFilter(value); }}>{value === "all" ? "All responses" : value === "read" ? "Reviewed" : "Needs review"}</button>)}</div>}
       <span className="muted-caption">{loadingReviewer ? "Loading…" : visibleRows.length + " shown"}</span>
     </div>}
     {!canManage && <div className="manager-toolbar"><div className="filter-pills" aria-label="Filter submissions">{(["all", "unread", "read"] as const).map((value) => <button type="button" key={value} className={filter === value ? "filter-pill active" : "filter-pill"} onClick={() => setFilter(value)}>{value === "all" ? "All responses" : value === "read" ? "Reviewed" : "Needs review"}</button>)}</div><span className="muted-caption">{visibleRows.length} shown</span></div>}
+    {canManage && view === "active" && !loadingReviewer && <div className="submission-bulk-toolbar"><label className="submission-select-all"><input type="checkbox" aria-label="Select all displayed submissions" checked={allVisibleSelected} disabled={visibleIds.length === 0 || busyId !== null} onChange={toggleAllVisible} /><span>{allVisibleSelected ? "Clear visible selection" : `Select all ${visibleIds.length} shown`}</span></label>{selectedIds.length > 0 && <div className="submission-bulk-actions"><span aria-live="polite">{selectedIds.length} selected</span><button type="button" className="button button-small danger-action" disabled={busyId !== null || selectedIds.length > 100} onClick={() => void archiveSelected()}><Archive size={13} /> {busyId === "bulk" ? "Archiving…" : "Archive selected"}</button><button type="button" className="icon-button" aria-label="Clear selection" title="Clear selection" disabled={busyId !== null} onClick={() => setSelectedIds([])}><X size={14} /></button></div>}</div>}
     {error && <p className="form-error" role="alert">{error}</p>}{notice && <p className="form-success" role="status">{notice}</p>}
     {loadingReviewer ? <div className="panel empty-state"><h2>Loading reviewer reviews</h2><p>Getting the selected reviewer’s submissions.</p></div> : visibleRows.length === 0 ? <div className="panel empty-state"><span className="empty-icon"><ClipboardList /></span><h2>{view === "archived" ? "No archived reviews" : "No responses in this view"}</h2><p>{view === "archived" ? "Archived reviews stay here until you restore or permanently delete them." : "Submitted feedback will appear here."}</p></div> :
-      <div className="panel submission-list">{visibleRows.map((row) => <article className={`submission-row ${canManage ? "submission-row-managed" : ""}`} key={row.id}>
+      <div className="panel submission-list">{visibleRows.map((row) => <article className={`submission-row ${canManage ? "submission-row-managed" : ""} ${selectedIds.includes(row.id) ? "submission-row-selected" : ""}`} key={row.id}>
+        {canManage && view === "active" && <label className="submission-select"><input type="checkbox" aria-label={`Select review for ${row.reviewedPersonName || row.target.displayName}`} checked={selectedIds.includes(row.id)} disabled={busyId !== null} onChange={() => toggleSelected(row.id)} /></label>}
         <span className={`submission-status ${row.reviewedAt ? "read" : ""}`}>{row.reviewedAt ? <CheckCheck size={15} /> : <ClipboardList size={15} />}</span>
         <Link className="submission-main" href={`${workspacePathForRole(`/submissions/${row.id}`, session.role)}${view === "archived" ? "?archived=true" : ""}`}><strong>{row.reviewedPersonName || row.target.displayName}</strong><small>{row.form.title} · Submitted by {row.reviewer.user.displayName} · Version {row.formVersion.version}</small></Link>
         <time className="submission-date">{formatDate(row.submittedAt)}</time>

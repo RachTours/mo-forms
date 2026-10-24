@@ -10,6 +10,9 @@ import { requestedReviewerScope } from "./submission-scope.js";
 
 export const submissionRouter = Router();
 const idSchema = z.string().uuid();
+const archiveBatchSchema = z.object({
+  submissionIds: z.array(idSchema).min(1).max(100).refine((ids) => new Set(ids).size === ids.length, "Submission IDs must be unique."),
+}).strict();
 
 submissionRouter.use(requireSession);
 submissionRouter.get("/", async (request, response, next) => {
@@ -53,6 +56,33 @@ submissionRouter.get("/archived", requirePermission("submissions", "read"), asyn
     const hasMore = rows.length > limit;
     const page = rows.slice(0, limit);
     response.json({ data: page.map(({ formVersion, answers, target, ...row }) => ({ ...row, target, formVersion: { version: formVersion.version }, reviewedPersonName: getReviewedPersonName(formVersion.definition, answers, target.displayName) })), nextCursor: hasMore ? page.at(-1)?.id ?? null : null });
+  } catch (error) { next(error); }
+});
+
+submissionRouter.post("/archive-batch", requirePermission("submissions", "archive"), requireCsrf, async (request, response, next) => {
+  try {
+    const { submissionIds } = archiveBatchSchema.parse(request.body);
+    const auth = request.auth!;
+    const archivedIds = await prisma.$transaction(async (transaction) => {
+      const current = await transaction.submission.findMany({
+        where: { organizationId: auth.organizationId, id: { in: submissionIds }, archivedAt: null },
+        select: { id: true },
+      });
+      if (current.length !== submissionIds.length) throw new HttpError(404, "SUBMISSION_NOT_FOUND", "One or more selected reviews are no longer active in this workspace.");
+
+      const archivedAt = new Date();
+      const updated = await transaction.submission.updateMany({
+        where: { organizationId: auth.organizationId, id: { in: submissionIds }, archivedAt: null },
+        data: { archivedAt },
+      });
+      if (updated.count !== submissionIds.length) throw new HttpError(409, "SUBMISSION_STATE_CONFLICT", "One or more selected reviews changed. Refresh the inbox and try again.");
+
+      await transaction.auditEvent.createMany({
+        data: submissionIds.map((entityId) => ({ organizationId: auth.organizationId, actorId: auth.userId, action: "SUBMISSION_ARCHIVED", entityType: "Submission", entityId })),
+      });
+      return submissionIds;
+    });
+    response.json({ data: { archivedIds } });
   } catch (error) { next(error); }
 });
 
