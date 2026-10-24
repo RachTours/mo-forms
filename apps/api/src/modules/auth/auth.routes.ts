@@ -48,8 +48,9 @@ function login(audience?: LoginAudience) {
       tokenHash: hashToken(token), userId: user.id, organizationId: membership.organizationId,
       membershipId: membership.id, expiresAt,
     } });
-    setSessionCookie(response, token, membership.role === "REVIEWER" ? "reviewer" : "admin");
+    setSessionCookie(response, token, membership.role === "REVIEWER" ? "reviewer" : "admin", session.id);
     response.status(200).json({
+      sessionId: session.id,
       user: { id: user.id, email: user.email, displayName: user.displayName },
       organization: { id: membership.organization.id, name: membership.organization.name, slug: membership.organization.slug },
       role: membership.role,
@@ -104,7 +105,7 @@ authRouter.post("/password-reset", authRateLimit, async (request, response, next
 authRouter.get("/session", requireSession, (request, response) => {
   const auth = request.auth;
   if (!auth) return response.status(401).end();
-    return response.status(200).json({ user: { id: auth.userId, email: auth.email, displayName: auth.displayName }, organizationId: auth.organizationId, organizationName: auth.organizationName, membershipId: auth.membershipId, role: auth.role, csrfToken: request.csrfToken });
+    return response.status(200).json({ user: { id: auth.userId, email: auth.email, displayName: auth.displayName }, organizationId: auth.organizationId, organizationName: auth.organizationName, membershipId: auth.membershipId, sessionId: auth.sessionId, role: auth.role, csrfToken: request.csrfToken });
 });
 
 authRouter.post("/logout", requireSession, requireCsrf, async (request, response, next) => {

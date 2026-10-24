@@ -12,7 +12,8 @@ import { env } from "../env.js";
 export const requireSession: RequestHandler = async (request, _response, next) => {
   try {
     const audience: SessionAudience = request.get("x-reviewroom-audience") === "reviewer" ? "reviewer" : "admin";
-    const cookieName = sessionCookieNameForRequest(request.cookies, audience);
+    const sessionSelector = request.get("x-reviewroom-session-id") ?? undefined;
+    const cookieName = sessionCookieNameForRequest(request.cookies, audience, sessionSelector);
     const token = request.cookies[cookieName] as string | undefined;
     if (!token || token.length > 128) throw new HttpError(401, "UNAUTHENTICATED", "Sign in to continue.");
     const session = await prisma.session.findUnique({

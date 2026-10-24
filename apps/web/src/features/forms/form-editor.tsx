@@ -8,6 +8,8 @@ import { formDefinitionSchema, formDefinitionWriteSchema, type FormDefinition, t
 import { useApi } from "../../lib/client-api";
 import { duplicateField, moveField, moveFieldTo, persistForm } from "./form-editor-actions";
 import { fieldPalette as palette, makeField } from "./form-editor-model";
+import { useWorkspaceSession } from "../../components/workspace-shell";
+import { withSessionSelector } from "../../lib/session-url";
 
 type FormRecord = { id: string; title: string; description: string; status: "DRAFT" | "PUBLISHED" | "ARCHIVED"; draftDefinition: unknown; currentPublishedId: string | null };
 type ActionFeedback = { phase: "idle" | "pending" | "success" | "error"; message: string };
@@ -20,6 +22,7 @@ function getRatingPreviewValues(field: Extract<FormField, { type: "rating" }>): 
 export function FormEditor({ initial }: { initial: FormRecord }) {
   const router = useRouter();
   const api = useApi();
+  const session = useWorkspaceSession();
   const initialDefinition = formDefinitionSchema.safeParse(initial.draftDefinition);
   const [definition, setDefinition] = useState<FormDefinition>(initialDefinition.success ? initialDefinition.data : { title: initial.title, description: initial.description, fields: [] });
   const [selected, setSelected] = useState<string | null>(definition.fields[0]?.id ?? null);
@@ -69,11 +72,11 @@ export function FormEditor({ initial }: { initial: FormRecord }) {
       setBusy(false);
     }
   }
-  async function archive() { if (!window.confirm("Archive this form? Existing submissions will remain available.")) return; setBusy(true); try { await api(`/forms/${initial.id}`, { method: "DELETE" }); router.push("/admin/forms"); } catch (error) { setDraftFeedback({ phase: "error", message: error instanceof Error ? error.message : "Could not archive the form." }); setBusy(false); } }
+  async function archive() { if (!window.confirm("Archive this form? Existing submissions will remain available.")) return; setBusy(true); try { await api(`/forms/${initial.id}`, { method: "DELETE" }); router.push(withSessionSelector("/admin/forms", session.sessionId)); } catch (error) { setDraftFeedback({ phase: "error", message: error instanceof Error ? error.message : "Could not archive the form." }); setBusy(false); } }
   async function permanentlyDelete() {
     if (window.prompt(`Permanently delete “${definition.title}” and its published versions and share links? Type the form title to confirm.`) !== definition.title) return;
     setBusy(true);
-    try { await api(`/forms/${initial.id}/permanent`, { method: "DELETE" }); router.push("/admin/forms"); }
+    try { await api(`/forms/${initial.id}/permanent`, { method: "DELETE" }); router.push(withSessionSelector("/admin/forms", session.sessionId)); }
     catch (error) { setDraftFeedback({ phase: "error", message: error instanceof Error ? error.message : "Could not permanently delete the form." }); setBusy(false); }
   }
   function updateOption(field: FormField, optionId: string, label: string) { if (!("options" in field)) return; updateField(field.id, { options: field.options.map((option) => option.id === optionId ? { ...option, label } : option) } as Partial<FormField>); }

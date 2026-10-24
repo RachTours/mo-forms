@@ -14,10 +14,20 @@ export function sessionCookieNameForAudience(audience: SessionAudience): string 
   return audience === "reviewer" ? reviewerSessionCookieName : adminSessionCookieName;
 }
 
+export function sessionCookieNameForSession(audience: SessionAudience, sessionId: string): string {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sessionId)) return "";
+  return `${cookiePrefix}-${audience}-${sessionId}`;
+}
+
 export function sessionCookieNameForRequest(
   cookies: Record<string, unknown>,
   audience: SessionAudience,
+  sessionId?: string,
 ): string {
+  if (sessionId !== undefined) {
+    const selected = sessionCookieNameForSession(audience, sessionId);
+    return selected && cookies[selected] ? selected : "";
+  }
   const requestedCookieName = sessionCookieNameForAudience(audience);
   if (cookies[requestedCookieName]) return requestedCookieName;
   if (!hasAudienceSessionCookie(cookies) && cookies[legacySessionCookieName]) return legacySessionCookieName;
@@ -46,11 +56,12 @@ function sessionCookieOptions(): CookieOptions {
   };
 }
 
-export function setSessionCookie(response: Response, token: string, audience: SessionAudience): void {
+export function setSessionCookie(response: Response, token: string, audience: SessionAudience, sessionId?: string): void {
   const options = sessionCookieOptions();
-  response.cookie(sessionCookieNameForAudience(audience), token, options);
+  response.cookie(sessionId ? sessionCookieNameForSession(audience, sessionId) : sessionCookieNameForAudience(audience), token, options);
   const { maxAge: _maxAge, ...clearOptions } = options;
   response.clearCookie(legacySessionCookieName, clearOptions);
+  if (sessionId) response.clearCookie(sessionCookieNameForAudience(audience), clearOptions);
 }
 
 export function clearSessionCookie(response: Response, cookieName: string): void {

@@ -6,6 +6,7 @@ import { apiErrorSchema, loginRequestSchema, loginResponseSchema, workspaceChoic
 import Link from "next/link";
 import { PasswordInput } from "./password-input";
 import { homePathForRole, roleMatchesAudience, safeWorkspaceReturnPath } from "../../lib/workspace-access";
+import { withSessionSelector } from "../../lib/session-url";
 
 export function LoginForm({ audience }: { audience: "admin" | "reviewer" }) {
   const router = useRouter();
@@ -41,7 +42,7 @@ export function LoginForm({ audience }: { audience: "admin" | "reviewer" }) {
         return;
       }
       const requestedPath = safeWorkspaceReturnPath(new URLSearchParams(window.location.search).get("returnTo"), audience);
-      router.replace(requestedPath ?? homePathForRole(session.data.role));
+      router.replace(withSessionSelector(requestedPath ?? homePathForRole(session.data.role), session.data.sessionId));
       router.refresh();
     } catch {
       setError("The sign-in service could not be reached. Try again in a moment.");

@@ -9,6 +9,8 @@ export async function serverApi(path: string, init: RequestInit = {}): Promise<R
   headers.set("cookie", cookieStore.toString());
   const audience = incomingHeaders.get("x-reviewroom-audience");
   headers.set("x-reviewroom-audience", audience === "reviewer" ? "reviewer" : "admin");
+  const sessionId = incomingHeaders.get("x-reviewroom-session-id");
+  if (sessionId) headers.set("x-reviewroom-session-id", sessionId);
   return fetch(`${apiOrigin}/api/v1${path}`, { ...init, headers, cache: "no-store" });
 }
 

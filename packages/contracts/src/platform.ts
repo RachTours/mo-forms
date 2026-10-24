@@ -29,6 +29,7 @@ export const loginRequestSchema = z.object({
 }).strict();
 
 export const loginResponseSchema = z.object({
+  sessionId: z.string().uuid(),
   user: z.object({ id: z.string().uuid(), email: z.string().email(), displayName: z.string().min(1).max(120) }).strict(),
   organization: z.object({ id: z.string().uuid(), name: z.string().min(1).max(160), slug: z.string().min(1).max(80) }).strict(),
   role: z.enum(roles),
@@ -40,6 +41,7 @@ export const sessionResponseSchema = z.object({
   organizationId: z.string().uuid(),
   organizationName: z.string().min(1).max(160),
   membershipId: z.string().uuid(),
+  sessionId: z.string().uuid(),
   role: z.enum(roles),
   csrfToken: z.string().length(64),
 }).strict();

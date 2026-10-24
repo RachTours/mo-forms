@@ -73,6 +73,7 @@ test("session and error response envelopes are strict and stable", () => {
     organizationId: "e6c9e1b9-af95-45c3-82b7-4fe7e608a189",
     organizationName: "Workspace",
     membershipId: "29939b21-1d8b-4d94-980e-375d8972a205",
+    sessionId: "33333333-3333-4333-8333-333333333333",
     role: "REVIEWER",
     csrfToken: "a".repeat(64),
   };
@@ -80,7 +81,7 @@ test("session and error response envelopes are strict and stable", () => {
   assert.equal(sessionResponseSchema.safeParse({ ...session, passwordHash: "must-not-leak" }).success, false);
   assert.equal(apiErrorSchema.safeParse({ error: { code: "ASSIGNMENT_CHANGED", message: "Refresh.", requestId: "request-1" } }).success, true);
   assert.equal(apiErrorSchema.safeParse({ error: { code: "x", message: "x", secret: "leak" } }).success, false);
-  const loginResponse = { user: session.user, organization: { id: session.organizationId, name: "Workspace", slug: "workspace" }, role: session.role, csrfToken: session.csrfToken };
+  const loginResponse = { sessionId: session.sessionId, user: session.user, organization: { id: session.organizationId, name: "Workspace", slug: "workspace" }, role: session.role, csrfToken: session.csrfToken };
   assert.equal(loginResponseSchema.safeParse(loginResponse).success, true);
   assert.equal(loginRequestSchema.safeParse({ email: "a@example.com", password: "password", organizationSlug: "my-workspace" }).success, true);
   assert.equal(workspaceChoiceResponseSchema.safeParse({ error: { code: "WORKSPACE_SELECTION_REQUIRED", message: "Choose a workspace." }, data: { workspaces: [{ id: session.organizationId, name: "Workspace", slug: "workspace", role: "REVIEWER" }] } }).success, true);

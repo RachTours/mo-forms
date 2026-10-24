@@ -25,6 +25,7 @@ export async function requestApi<T>(
   options: {
     role: AudienceRole;
     csrfToken: string;
+    sessionId: string;
     fetcher?: typeof fetch;
     schema?: RuntimeSchema<T>;
   },
@@ -36,6 +37,7 @@ export async function requestApi<T>(
   const method = (init.method ?? "GET").toUpperCase();
   const headers = new Headers(init.headers);
   headers.set("X-Reviewroom-Audience", options.role === "REVIEWER" ? "reviewer" : "admin");
+  headers.set("X-Reviewroom-Session-Id", options.sessionId);
   if (init.body !== undefined && init.body !== null && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (!["GET", "HEAD", "OPTIONS"].includes(method)) headers.set("X-CSRF-Token", options.csrfToken);
 

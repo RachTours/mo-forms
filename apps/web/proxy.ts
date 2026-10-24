@@ -11,6 +11,8 @@ export function proxy(request: NextRequest) {
   const contentSecurityPolicy = createContentSecurityPolicy(nonce, process.env.NODE_ENV !== "production");
   requestHeaders.set("x-reviewroom-audience", audience);
   requestHeaders.set("x-reviewroom-request-path", path);
+  const sessionSelector = request.nextUrl.searchParams.get("rr_session");
+  if (sessionSelector !== null) requestHeaders.set("x-reviewroom-session-id", sessionSelector);
   requestHeaders.set("Content-Security-Policy", contentSecurityPolicy);
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", contentSecurityPolicy);
