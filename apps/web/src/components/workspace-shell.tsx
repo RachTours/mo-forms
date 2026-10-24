@@ -4,11 +4,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ClipboardList, Files, LayoutDashboard, Link2, LogOut, Settings2, UsersRound, UserRoundCog } from "lucide-react";
 import type { SessionResponse } from "@reviewroom/contracts";
-import { createContext, useContext } from "react";
+import { createContext, useContext, useState } from "react";
 import { getNavigationForRole, homePathForRole, signInPathForRole } from "../lib/workspace-access";
 import { workspaceThemeCssVariables, type safeWorkspaceTheme } from "../lib/workspace-theme";
 import { panelNameForAudience } from "../lib/panel-brand";
 import { withSessionSelector, workspaceNavigationTarget } from "../lib/session-url";
+import { requestSignOut, signOutErrorMessage } from "../lib/sign-out";
 
 const SessionContext = createContext<SessionResponse | null>(null);
 export function useWorkspaceSession(): SessionResponse {
@@ -20,17 +21,27 @@ export function useWorkspaceSession(): SessionResponse {
 export function WorkspaceShell({ session, theme, children }: { session: SessionResponse; theme: ReturnType<typeof safeWorkspaceTheme>; children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string>();
   const icons: Record<string, typeof LayoutDashboard> = { "Overview": LayoutDashboard, "People": UsersRound, "Submissions": ClipboardList, "My form links": Link2, "Forms": Files, "Team access": UserRoundCog, "Settings": Settings2 };
   const navigation = getNavigationForRole(session.role).map((item) => ({ ...item, icon: icons[item.label]! }));
   const panelName = panelNameForAudience(session.role === "REVIEWER" ? "reviewer" : "admin");
 
   async function signOut() {
-    const headers = new Headers({ "X-CSRF-Token": session.csrfToken, "X-Reviewroom-Audience": session.role === "REVIEWER" ? "reviewer" : "admin" });
-    if (session.sessionId) headers.set("X-Reviewroom-Session-Id", session.sessionId);
-    const response = await fetch("/api/v1/auth/logout", { method: "POST", credentials: "same-origin", headers });
-    if (response.ok) {
-      router.replace(signInPathForRole(session.role));
-      router.refresh();
+    if (signingOut) return;
+    setSigningOut(true);
+    setSignOutError(undefined);
+    try {
+      const response = await requestSignOut(session);
+      if (response.ok || response.status === 401) {
+        window.location.replace(signInPathForRole(session.role));
+        return;
+      }
+      setSignOutError(await signOutErrorMessage(response));
+    } catch {
+      setSignOutError("The sign-out service could not be reached. Check your connection and try again.");
+    } finally {
+      setSigningOut(false);
     }
   }
 
@@ -58,7 +69,7 @@ export function WorkspaceShell({ session, theme, children }: { session: SessionR
       <nav className="nav-list" aria-label="Main">
         {navigation.map(({ href, label, icon: Icon }) => <Link key={href} className="nav-link" href={withSessionSelector(href, session.sessionId)} aria-current={pathname === href ? "page" : undefined}><Icon aria-hidden="true" /><span>{label}</span></Link>)}
       </nav>
-      <div className="side-profile"><span className="avatar" aria-hidden="true">{initials || "U"}</span><div><strong>{session.user.displayName}</strong><small>{session.role.toLowerCase()}</small></div><button className="icon-button" onClick={signOut} type="button" aria-label="Sign out"><LogOut size={15} /></button></div>
+      <div className="side-profile"><span className="avatar" aria-hidden="true">{initials || "U"}</span><div><strong>{session.user.displayName}</strong><small>{session.role.toLowerCase()}</small></div><button className="icon-button" onClick={() => void signOut()} type="button" aria-label="Sign out" title={signingOut ? "Signing out…" : "Sign out"} disabled={signingOut}><LogOut size={15} /></button>{signOutError && <p className="form-error signout-error" role="alert">{signOutError}</p>}</div>
     </aside>
     <main className="main-region">
       <header className="topbar"><div className="breadcrumb">{panelName}&nbsp; / &nbsp;<strong>{active}</strong></div><div className="top-actions"><span className="avatar" aria-hidden="true">{initials || "U"}</span></div></header>
