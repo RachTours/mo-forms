@@ -1,4 +1,4 @@
-# ReviewRoom rebuild status audit — 2026-10-23
+# ReviewRoom rebuild status audit — 2026-10-24
 
 This is an evidence audit of the 49 tasks in `docs/superpowers/plans/2026-10-23-reviewroom-platform-rebuild.md`, not a claim that the rebuild is complete. “Complete” means source and local verification meet the task's acceptance criteria. A feature existing without its required integration, browser, staging, restore, or capacity evidence is marked partial.
 
@@ -54,12 +54,12 @@ This is an evidence audit of the 49 tasks in `docs/superpowers/plans/2026-10-23-
 | 7.3 | Not started | No resumable checkpointed backfill tool or restart/idempotency tests were found. |
 | 7.4 | Not started | No restore rehearsal or completed cutover runbook exists. |
 | 7.5 | Partial | Legacy route families remain in the route map and current app; compatibility telemetry/contract tests are missing. |
-| 8.1 | Partial | `.github/workflows/ci.yml` covers basic install/typecheck/lint/unit/build/audit steps. Its CI origins use reserved HTTPS placeholders so production validation accepts them; it still has no MySQL service or browser stage. |
+| 8.1 | Partial | `.github/workflows/ci.yml` covers basic install/typecheck/lint/unit/build/audit steps. Root `npm test` now generates the ignored Prisma client using a loopback-only test fallback when no DB settings are supplied; clean-worktree verification passed 205 tests without connecting to MySQL. CI still has no MySQL service, migration/integration jobs, Playwright configuration, fixtures/seed helpers, or browser stage. |
 | 8.2 | Not started | No `apps/web/e2e/` workflow suite was found. |
 | 8.3 | Partial | Some accessibility and signature unit tests exist; axe, keyboard/browser matrix, manual device checks and documented results are absent. |
 | 8.4 | Partial | A historical security audit and current source controls exist; a fresh targeted security review and residual-risk record remain outstanding. |
 | 8.5 | Blocked | `scripts/local-load-check.mjs` is only a capped smoke profile. No staging/production-sized DB was available for expected/3x/burst measurements. |
-| 8.6 | Partial | `npm ci`, lint, typecheck, all 209 unit tests, production build and Hostinger standalone packaging pass. Local liveness and login page returned 200 using temporary processes. No MySQL integration/E2E or DB-ready smoke was possible. |
+| 8.6 | Partial | On 2026-10-24 with Node 24.12.0/npm 11.6.2, fresh-worktree `npm ci`, `npm run lint`, `npm run typecheck`, root `npm test` (205 tests, no DB variables), and `npm run build` passed. Build/typecheck used safe placeholder values and did not connect to MySQL. MySQL integration/E2E, Hostinger standalone packaging, DB-ready smoke, and restore evidence remain incomplete. |
 | 9.1 | Blocked | Hostinger operation search works, but read-only deployment queries for both live sites did not return. Node/entry/output snippets are from historical user-provided logs, not verified current account settings or plan limits. |
 | 9.2 | Blocked | No isolated staging apps/database or staging secrets are configured. |
 | 9.3 | Blocked | Requires the staging apps and database from 9.2. |
