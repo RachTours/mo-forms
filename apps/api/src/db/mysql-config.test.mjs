@@ -1,6 +1,24 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildDatabaseUrl, readMysqlConnection, resolveMysqlSsl } from "../../dist/db/mysql-config.js";
+import * as mysqlConfig from "../../dist/db/mysql-config.js";
+import { buildDatabaseUrl, createMysqlPoolConfig, readMysqlConnection, resolveMysqlSsl } from "../../dist/db/mysql-config.js";
+
+test("uses the schema collation for database connections", () => {
+  assert.equal(mysqlConfig.connectionCollation, "utf8mb4_unicode_ci");
+  const connection = readMysqlConnection({
+    DB_HOST: "127.0.0.1",
+    DB_PORT: "3306",
+    DB_NAME: "reviewroom",
+    DB_USER: "reviewroom_app",
+    DB_PASSWORD: "safe-password",
+  });
+  assert.deepEqual(createMysqlPoolConfig(connection, false, 5), {
+    ...connection,
+    connectionLimit: 5,
+    ssl: false,
+    collation: "utf8mb4_unicode_ci",
+  });
+});
 
 test("reads the separate Hostinger MySQL settings", () => {
   assert.deepEqual(readMysqlConnection({

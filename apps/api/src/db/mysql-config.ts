@@ -15,6 +15,16 @@ export type MysqlConnection = {
   password: string;
 };
 
+export const connectionCollation = "utf8mb4_unicode_ci" as const;
+
+export function createMysqlPoolConfig(
+  connection: MysqlConnection,
+  ssl: false | { rejectUnauthorized: true },
+  connectionLimit: number,
+) {
+  return { ...connection, connectionLimit, ssl, collation: connectionCollation };
+}
+
 const componentKeys = ["DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD"] as const;
 const hasValue = (value: string | number | undefined): boolean => value !== undefined && String(value) !== "";
 
