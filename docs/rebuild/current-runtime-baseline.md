@@ -1,62 +1,47 @@
 # ReviewRoom Current Runtime Baseline
 
-**Captured:** 2026-10-23  
-**Scope:** Repository inspection only. No live Hostinger settings, production database, or secrets were accessed.
+**Captured:** 2026-10-24
+**Scope:** Repository inspection and local verification in an isolated worktree. No Hostinger account, deployed runtime, live database, or secret store was accessed.
 
-## Runtime and repository
+## What this baseline does and does not establish
 
-- npm workspaces: `apps/*` and `packages/*`; root Node engine accepts `>=22.12 <23 || >=24 <25`.
-- Web: `apps/web`, Next.js 16.4.2 App Router, React 19. Build is `next build --webpack`; output is standalone with repository-root tracing. Hostinger preparation is `apps/web/scripts/prepare-hostinger-standalone.mjs`.
-- API: `apps/api`, Express 5, TypeScript, Prisma 7 with `@prisma/adapter-mariadb`. Compiled entry is `apps/api/dist/server.js`; npm start script is `node dist/server.js` from the API workspace.
-- Shared contract package: `packages/contracts`; no separate domain or UI package exists yet.
-- Persistence schema: `apps/api/prisma/schema.prisma`; 11 committed migrations, through `202610230001_assignment_integrity`.
-- Current main package test scripts run API Node tests and web Node tests. API package test builds contracts/API and then runs `node --test`; web uses Node's built-in test runner with TypeScript strip-types.
+This document records what the checked-out repository requires and what its local test suite exercised. It does **not** prove the current Hostinger applications, selected Node runtime, configured domains/origins, entry/output paths, environment values, database host/version, schema state, or plan limits. The Hostinger deployment guide describes the repository's intended configuration; validate every live setting in the relevant Hostinger account or staging environment before treating it as operational fact.
 
-## API modules and current route families
+## Repository and runtime inventory
 
-Inspected route modules under `apps/api/src/modules/`:
+- The root is an npm workspace monorepo: `apps/*` and `packages/*`. Its declared Node engine is `>=22.12 <23 || >=24 <25`; the root package manager is npm `11.6.2`.
+- `apps/web` is a Next.js 16.4.2 / React 19 App Router application. `next.config.ts` selects standalone output, repository-root tracing, and resolves `API_INTERNAL_URL` while the web build runs. `npm run build:hostinger:web` prepares `apps/web/.next/hostinger/server.js` plus the traced runtime dependencies, shared packages, and static assets.
+- `apps/api` is an Express 5 / TypeScript service using Prisma 7 and `@prisma/adapter-mariadb`; its compiled start entry is `apps/api/dist/server.js`. `PORT` overrides the local `API_PORT` setting.
+- `packages/contracts` owns shared API/form schemas and OpenAPI contracts. `packages/domain` owns pure permission and assignment-policy rules shared by the API and its tests.
+- Prisma's schema is `apps/api/prisma/schema.prisma`. Eleven committed migrations end at `202610230001_assignment_integrity`. The generated Prisma client is intentionally ignored at `apps/api/src/generated/` and must be produced before API compilation.
 
-- `auth/auth.routes.ts`
-- `members/member.routes.ts`
-- `targets/target.routes.ts`
-- `assignments/assignment.routes.ts`
-- `forms/form.routes.ts`
-- `links/review-link.routes.ts`
-- `submissions/public-review.routes.ts` and `submissions/submission.routes.ts`
-- `progress/progress.routes.ts`
-- `organization/organization.routes.ts`
-- `audit/audit.routes.ts`
+## Current application surface
 
-`apps/api/src/app.ts` registers them under `/api/v1`; health routes are `/health`, `/api/v1/health/live`, and `/api/v1/health/ready`. Root GET `/health` returns the Hostinger-friendly JSON liveness response. `apps/api/src/server.ts` uses `env.API_PORT` and `env.HOST`; `PORT` takes precedence in environment parsing.
+- API route modules cover auth, members, targets, assignments, forms, reviewer links, public review/submissions, progress, organization, and audit events. `apps/api/src/app.ts` mounts application routes below `/api/v1`; liveness is available at `/health` and `/api/v1/health/live`, while `/api/v1/health/ready` queries MySQL.
+- The web app exposes role-scoped admin and reviewer entry/login URLs, rewrites those URLs to shared authenticated workspace pages, and keeps public invitation, password-reset, and reviewer-link submission routes. `docs/routing-and-workspace-architecture.md` is the route contract. Rewrites are routing only; server-side page checks and API middleware remain authorization boundaries.
+- The data model includes Organization, User, Membership, Session, Form, FormVersion, ReviewTarget, Assignment, ReviewLink, Submission, ProgressConfig, OrganizationTheme, Invitation, PasswordResetToken, and AuditEvent. Key constraints include one assignment per organization/target and same-organization composite foreign keys for assignments; form versions are unique per form/version; submissions retain form-version, target, reviewer, idempotency-key, and payload-hash evidence.
+- `.env.example` documents safe key names and placeholders only. API configuration accepts component `DB_*` settings (or compatibility `DATABASE_URL`), session/origin settings, optional `TOKEN_ENCRYPTION_KEY`, and optional `TRUSTED_PROXIES`. The API Hostinger build script generates Prisma, runs assignment-integrity preflight and migrations, builds contracts/domain, optionally bootstraps a first owner, then builds the API. It therefore needs staging validation, backup, and restore rehearsal before production use.
 
-## Browser route baseline
+## Fresh-worktree verification
 
-App Router files under `apps/web/app` currently include admin entry/sign-in, reviewer entry/sign-in, shared workspace pages for overview, people, submissions, forms, team and settings, plus invitation, reset, and public review routes. `apps/web/next.config.ts` rewrites role-specific URLs to shared internal workspace pages and proxies same-origin `/api/:path*` to `API_INTERNAL_URL`. Role enforcement also exists in page access helpers and API middleware; the rewrite is not an authorization boundary.
-
-## Database model and constraints inspected
-
-Models include Organization, User, Membership, Session, Form, FormVersion, ReviewTarget, Assignment, ReviewLink, Submission, ProgressConfig, OrganizationTheme, Invitation, PasswordResetToken, and AuditEvent. Assignment has a unique `(organizationId, targetId)` key and composite same-organization foreign keys to target and reviewer. Form versions are unique per form/version; submissions carry form-version, target, reviewer, idempotency key and payload hash. The current schema retains historical submission relations when a form, target, or reviewer is referenced.
-
-## Environment and deployment code
-
-- Safe key names/placeholders are in root `.env.example`; `.env` is gitignored. API parsing is in `apps/api/src/env.ts` and MySQL settings in `apps/api/src/db/mysql-config.ts`.
-- API accepts Hostinger `PORT` or local `API_PORT`, `HOST`, `DB_*` or compatibility `DATABASE_URL`, pool limit, `SESSION_SECRET`, `WEB_ORIGIN`, optional `TOKEN_ENCRYPTION_KEY`, and optional `TRUSTED_PROXIES`.
-- Web config resolves `API_INTERNAL_URL` during build. The web runtime uses Next standalone output.
-- `scripts/build-hostinger-api.mjs` generates Prisma, runs assignment preflight and migrations, builds contracts/API, and supports optional one-time bootstrap values. Because it applies migrations during the host build, staging verification and a backup/restore rehearsal are required before any production use.
-- `docs/hostinger-deployment.md` documents intended separate web/API Node applications and app-specific root/build/output/entry values. These are repository documentation, not proof of the live account configuration.
-
-## Verification baseline
-
-Inspected commands and results on Node 24.12.0 / npm 11.6.2 in the isolated rebuild worktree:
+The following PowerShell commands were run in this isolated worktree. All values are local test placeholders; none are credentials.
 
 | Command | Result |
-|---|---|
-| `npm test` with required API env vars unset | Failed during API test module initialization because `SESSION_SECRET` and `WEB_ORIGIN` are required. |
-| `$env:SESSION_SECRET='test-only-session-secret-000000000000000000000000'; $env:WEB_ORIGIN='http://localhost:3000'; $env:NODE_ENV='test'; $env:DB_HOST='127.0.0.1'; $env:DB_PORT='3306'; $env:DB_NAME='reviewroom_test_unused'; $env:DB_USER='reviewroom_test_unused'; $env:DB_PASSWORD='reviewroom_test_unused'; npm test` | Passed. API 84/84; web 46/46. The dummy DB settings allow configuration parsing only; the suite did not connect to MySQL. |
-| `git diff --check` on the inventory changes | Passed. |
+| --- | --- |
+| `npm ci` | Passed: 574 packages installed; audit reported 0 vulnerabilities. |
+| `$env:SESSION_SECRET='test-only-session-secret-000000000000000000000000'; $env:WEB_ORIGIN='http://localhost:5000'; $env:NODE_ENV='test'; $env:DB_HOST='127.0.0.1'; $env:DB_PORT='3306'; $env:DB_NAME='reviewroom_test_unused'; $env:DB_USER='reviewroom_test_unused'; $env:DB_PASSWORD='reviewroom_test_unused'; npm test` after the ignored generated Prisma client was absent | Failed during the API TypeScript build because `src/generated/prisma/client.js` was missing. The downstream implicit-type errors are consequences of that missing generated module. |
+| `$env:DATABASE_URL='mysql://reviewroom_test_unused:reviewroom_test_unused@127.0.0.1:3306/reviewroom_test_unused'; npm run db:generate` | Passed and generated the Prisma client locally. Prisma loaded its configuration and schema; this command did not run migrations or connect to MySQL. |
+| The same safe `SESSION_SECRET`, `WEB_ORIGIN`, `NODE_ENV`, and `DB_*` placeholder assignments followed by `npm test` | Passed: contracts 12, domain 11, API 118, web 68. |
 
-No local or remote DB migration, integration suite, browser E2E suite, load test, Hostinger staging deploy, or restore rehearsal has been performed in this baseline.
+The test configuration uses loopback placeholder database values only to satisfy configuration parsing. The test suite did not connect to MySQL: its database-facing cases use fakes/mocks, and the only ready-check test asserts behavior without querying after graceful shutdown begins. No migration, staging deployment, browser E2E, load test, backup/restore rehearsal, or live Hostinger verification was performed.
 
-## External facts still requiring account/staging confirmation
+## Required live-environment confirmation
 
-The connected Hostinger lookup was interrupted and yielded no verified account data. Before deployment configuration is treated as final, confirm directly in the account: the actual web/API Node app domains, Node version, repository branch/revision, build root, command, output directory, entry file, runtime port behavior, HTTPS origins, database version/host, available app slots and plan resource limits. Do not infer these values from historical screenshots or build logs.
+Before deployment parameters are locked, confirm directly in the intended Hostinger account or staging environment:
+
+1. That two Node.js applications exist for the web and API services, and their current domains, repository revision, root/build/output/entry settings, and port behavior match the intended guide.
+2. The selected Node runtime and plan limits (application slots, process/memory, timeout, and routing behavior).
+3. The actual HTTPS origins, API reachability, CORS/cookie/CSRF behavior, and build-time `API_INTERNAL_URL` value.
+4. The database host, engine/version, credentials, migration state, capacity, backups, and a restore rehearsal.
+
+None of these facts can be inferred safely from the repository, historical documentation, screenshots, or prior build output.

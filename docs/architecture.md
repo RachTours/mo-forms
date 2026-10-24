@@ -9,10 +9,12 @@ Browser
             └─ Express REST API
                  ├─ auth, role, CSRF, validation, rate-limit middleware
                  ├─ domain modules (forms, members, targets, assignments, links, submissions, progress)
+                 ├─ packages/contracts (shared schemas and API contracts)
+                 ├─ packages/domain (shared permission and assignment policy)
                  └─ Prisma 7 + MariaDB adapter → MySQL
 ```
 
-The API is the authority for permissions and business rules. The web layer forwards the HttpOnly session cookie for server rendering and uses same-origin browser requests for mutations. Zod schemas in `packages/contracts` are shared between the web app and API; the API still validates every request independently.
+The API is the authority for permissions and business rules. The web layer forwards the HttpOnly session cookie for server rendering and uses same-origin browser requests for mutations. Zod schemas in `packages/contracts` are shared between the web app and API; pure permission and assignment-policy rules live in `packages/domain`. The API still validates every request independently and remains the only layer that authorizes persisted data.
 
 ## Domain boundaries
 
